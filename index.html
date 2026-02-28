@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>RenatAI Turbo Internet 🔥</title>
+<style>
+body { background:#111; color:#0f0; font-family:monospace; padding:20px; }
+#chat { height:400px; overflow-y:auto; border:1px solid #0f0; padding:10px; margin-bottom:10px; }
+input { width:70%; padding:5px; background:#222; color:#0f0; border:1px solid #0f0; }
+button { padding:5px 10px; background:#0f0; color:#111; border:none; cursor:pointer; font-weight:bold; }
+</style>
+</head>
+<body>
+
+<h1>RenatAI Turbo Internet 🔥</h1>
+<div id="chat"></div>
+<input type="text" id="userInput" placeholder="Pergunta ou link..." />
+<button onclick="sendMessage()">Enviar</button>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
+import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";
+
+// 🔹 Firebase Config
+const firebaseConfig = {
+  apiKey: "AIzaSyCjtuE9XQtIqvw2hZqSNpkHraY2d5_2B3w",
+  authDomain: "classroom-chat-4a364.firebaseapp.com",
+  databaseURL: "https://classroom-chat-4a364-default-rtdb.firebaseio.com",
+  projectId: "classroom-chat-4a364",
+  storageBucket: "classroom-chat-4a364.appspot.com",
+  messagingSenderId: "750796804774",
+  appId: "1:750796804774:web:b1b4aafd8bc6cdd5559a67"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const memRef = ref(db, 'memory');
+
+const chat = document.getElementById('chat');
+const input = document.getElementById('userInput');
+
+let memory = [];
+onValue(memRef, snapshot => {
+  memory = [];
+  snapshot.forEach(snap => memory.push(snap.val()));
+});
+
+// Função simples de resumo
+function summarize(text, top=100){
+  const words = text.replace(/\W/g,' ').toLowerCase().split(/\s+/);
+  const freq = {};
+  words.forEach(w=>{ if(w.length>2) freq[w]=(freq[w]||0)+1; });
+  const sorted = Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,top);
+  return sorted.map(x=>x[0]).join(' ');
+}
+
+function saveMemory(text) {
+  push(memRef, { text, timestamp: Date.now() });
+}
+
+// Função que busca em múltiplos sites usando AllOrigins
+async function searchInternet(query) {
+  // Lista de sites que a IA vai tentar pegar info
+  const sites = [
+    `https://pt.wikipedia.org/wiki/${encodeURIComponent(query)}`,
+    `https://www.britannica.com/search?query=${encodeURIComponent(query)}`,
+    `https://www.fazfacil.com/search?q=${encodeURIComponent(query)}`
+  ];
+  let combinedText = "";
+  for(const site of sites){
+    try{
+      const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(site)}`);
+      const htmlText = await res.text();
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(htmlText, "text/html");
+      combinedText += " " + summarize(doc.body.innerText || doc.body.textContent, 50);
+    }catch(e){
+      console.log("Falhou:", site);
+    }
+  }
+  return combinedText || "Não consegui achar nada online.";
+}
+
+// Função que gera a resposta
+async function generateResponse(userText){
+  if(!memory.length) return await searchInternet(userText);
+
+  let bestMatch = "";
+  let maxScore = 0;
+  memory.forEach(item => {
+    let score = 0;
+    userText.toLowerCase().split(' ').forEach(word => {
+      if(item.text.toLowerCase().includes(word)) score++;
+    });
+    if(score > maxScore){
+      maxScore = score;
+      bestMatch = item.text;
+    }
+  });
+  if(maxScore>0) return bestMatch;
+  return await searchInternet(userText);
+}
+
+// Envia mensagem
+async function sendMessage() {
+  const text = input.value.trim();
+  if(!text) return;
+  chat.innerHTML += `<div><b>Você:</b> ${text}</div>`;
+  input.value = '';
+
+  let response = "";
+
+  if(text.startsWith("http")) {
+    try {
+      const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(text)}`);
+      const htmlText = await res.text();
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(htmlText, "text/html");
+      const bodyText = doc.body.innerText || doc.body.textContent;
+      const summary = summarize(bodyText, 100);
+      saveMemory(summary);
+      response = "Aprendi algo novo desse site!";
+    } catch(e) {
+      response = "Não consegui acessar o site.";
+    }
+  } else {
+    response = await generateResponse(text);
+    saveMemory(response); // salvar resposta gerada também
+  }
+
+  chat.innerHTML += `<div><b>RenatAI:</b> ${response}</div>`;
+  chat.scrollTop = chat.scrollHeight;
+}
+</script>
+
+</body>
+</html>
