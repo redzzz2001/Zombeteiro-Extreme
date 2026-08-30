@@ -1,137 +1,316 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<title>RenatAI Turbo Internet 🔥</title>
-<style>
-body { background:#111; color:#0f0; font-family:monospace; padding:20px; }
-#chat { height:400px; overflow-y:auto; border:1px solid #0f0; padding:10px; margin-bottom:10px; }
-input { width:70%; padding:5px; background:#222; color:#0f0; border:1px solid #0f0; }
-button { padding:5px 10px; background:#0f0; color:#111; border:none; cursor:pointer; font-weight:bold; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Zombie Extreme 🧟‍♂️</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Nosifer&display=swap');
+    body {
+      margin: 0;
+      font-family: 'Nosifer', cursive, sans-serif;
+      background: linear-gradient(135deg, #1a0000 0%, #330000 70%);
+      color: #ff3b3b;
+      text-align: center;
+      overflow-x: hidden;
+      user-select: none;
+    }
+    #gameArea {
+      width: 100vw;
+      height: 80vh;
+      border: 3px solid #ff0000;
+      position: relative;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 20% 30%, rgba(255,0,0,0.5), transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(255,0,0,0.4), transparent 40%),
+        radial-gradient(circle at 50% 50%, rgba(120,0,0,0.7), transparent 60%),
+        #190000;
+    }
+    .zumbi { position: absolute; top: 0; pointer-events: none; user-select: none; }
+    .fraco { width: 60px; height: 60px; }
+    .medio { width: 75px; height: 75px; }
+    .forte { width: 90px; height: 90px; }
+    .laser {
+      position: absolute;
+      width: 16px;
+      height: 100%;
+      background: #ff0000;
+      top: 0;
+      z-index: 10;
+      border-radius: 4px;
+      box-shadow: 0 0 10px #ff4444, 0 0 20px #ff0000;
+    }
+    #lifeBarContainer {
+      width: 80%;
+      height: 22px;
+      margin: 10px auto 15px auto;
+      background: #330000;
+      border: 2px solid #ff0000;
+      border-radius: 12px;
+      box-shadow: 0 0 8px #ff0000 inset;
+    }
+    #lifeBar {
+      width: 100%;
+      height: 100%;
+      background: #ff1a1a;
+      border-radius: 12px;
+      transition: width 0.3s ease;
+      box-shadow: 0 0 12px #ff1a1a;
+    }
+    #score, #fase { font-size: 22px; margin: 5px 0; }
+    button {
+      padding: 14px 30px;
+      font-size: 20px;
+      background: #ff0000;
+      color: black;
+      font-weight: bold;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      margin: 10px;
+    }
+    .upgradeOption {
+      margin: 10px;
+      padding: 12px;
+      background: #440000;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 18px;
+      color: white;
+      border: 2px solid red;
+    }
+  </style>
 </head>
 <body>
+  <h1>Zombie Extreme 🧟‍♂️</h1>
+  <div id="score">Pontos: 0</div>
+  <div id="fase">Fase: 1</div>
+  <div id="lifeBarContainer"><div id="lifeBar"></div></div>
+  <div id="gameArea"></div>
+  <button id="startBtn">▶️ Jogar</button>
 
-<h1>RenatAI Turbo Internet 🔥</h1>
-<div id="chat"></div>
-<input type="text" id="userInput" placeholder="Pergunta ou link..." />
-<button onclick="sendMessage()">Enviar</button>
+  <audio id="shootSound" src="https://assets.mixkit.co/sfx/preview/mixkit-laser-gun-shot-1678.mp3" preload="auto"></audio>
+  <audio id="zumbiDeathSound" src="https://assets.mixkit.co/sfx/preview/mixkit-monster-growl-924.mp3" preload="auto"></audio>
+  <audio id="zumbiPassSound" src="https://assets.mixkit.co/sfx/preview/mixkit-monster-growl-946.mp3" preload="auto"></audio>
+  <audio id="bgMusic" src="https://cdn.freesound.org/previews/568/568985_6970232-lq.mp3" preload="auto" loop></audio>
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
-import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";
+  <script>
+    const gameArea = document.getElementById("gameArea");
+    const scoreEl = document.getElementById("score");
+    const faseEl = document.getElementById("fase");
+    const lifeBar = document.getElementById("lifeBar");
+    const shootSound = document.getElementById("shootSound");
+    const zumbiDeathSound = document.getElementById("zumbiDeathSound");
+    const zumbiPassSound = document.getElementById("zumbiPassSound");
+    const bgMusic = document.getElementById("bgMusic");
+    const startBtn = document.getElementById("startBtn");
 
-// 🔹 Firebase Config
-const firebaseConfig = {
-  apiKey: "AIzaSyCjtuE9XQtIqvw2hZqSNpkHraY2d5_2B3w",
-  authDomain: "classroom-chat-4a364.firebaseapp.com",
-  databaseURL: "https://classroom-chat-4a364-default-rtdb.firebaseio.com",
-  projectId: "classroom-chat-4a364",
-  storageBucket: "classroom-chat-4a364.appspot.com",
-  messagingSenderId: "750796804774",
-  appId: "1:750796804774:web:b1b4aafd8bc6cdd5559a67"
-};
+    let score = 0, fase = 1, vida = 100;
+    let dano = 1, laserCount = 1, laserSpeed = 200;
+    let danoReducao = 0;
+    let isUpgradeOpen = false;
+    let upgradesObtidos = 0;
+    const maxUpgrades = 6;
+    let spawnInterval;
+    const upgrades = [
+      { key: "dano", label: "🔫 +1 Dano" },
+      { key: "velocidade", label: "⚡ + Velocidade do Laser" },
+      { key: "vida", label: "❤️ Recuperar Vida" },
+      { key: "alcance", label: "📏 + Alcance do Laser" },
+      { key: "maisLaser", label: "🎯 +1 Laser simultâneo" },
+      { key: "escudo", label: "🛡️ + Redução de dano" }
+    ];function createSVGZumbi(tipo) {
+      const svgNS = "http://www.w3.org/2000/svg";
+      const svg = document.createElementNS(svgNS, "svg");
+      svg.setAttribute("viewBox", "0 0 100 100");
+      svg.setAttribute("width", "100%");
+      svg.setAttribute("height", "100%");
 
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-const memRef = ref(db, 'memory');
+      const head = document.createElementNS(svgNS, "circle");
+      head.setAttribute("cx", 50);
+      head.setAttribute("cy", 50);
+      head.setAttribute("r", 45);
+      head.setAttribute("fill", "black");
+      head.setAttribute("stroke", "red");
+      head.setAttribute("stroke-width", 4);
+      svg.appendChild(head);
 
-const chat = document.getElementById('chat');
-const input = document.getElementById('userInput');
+      for (let i = 0; i < 2; i++) {
+        const eye = document.createElementNS(svgNS, "circle");
+        eye.setAttribute("cx", 30 + i * 40);
+        eye.setAttribute("cy", 40);
+        eye.setAttribute("r", tipo === "fraco" ? 6 : tipo === "medio" ? 10 : 14);
+        eye.setAttribute("fill", tipo === "fraco" ? "#ff4d4d" : tipo === "medio" ? "#ff1a1a" : "#ff0000");
+        svg.appendChild(eye);
+      }
 
-let memory = [];
-onValue(memRef, snapshot => {
-  memory = [];
-  snapshot.forEach(snap => memory.push(snap.val()));
-});
+      const mouth = document.createElementNS(svgNS, "rect");
+      mouth.setAttribute("x", 25);
+      mouth.setAttribute("y", 65);
+      mouth.setAttribute("width", tipo === "forte" ? 50 : 40);
+      mouth.setAttribute("height", 10);
+      mouth.setAttribute("fill", "#330000");
+      svg.appendChild(mouth);
 
-// Função simples de resumo
-function summarize(text, top=100){
-  const words = text.replace(/\W/g,' ').toLowerCase().split(/\s+/);
-  const freq = {};
-  words.forEach(w=>{ if(w.length>2) freq[w]=(freq[w]||0)+1; });
-  const sorted = Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,top);
-  return sorted.map(x=>x[0]).join(' ');
-}
-
-function saveMemory(text) {
-  push(memRef, { text, timestamp: Date.now() });
-}
-
-// Função que busca em múltiplos sites usando AllOrigins
-async function searchInternet(query) {
-  // Lista de sites que a IA vai tentar pegar info
-  const sites = [
-    `https://pt.wikipedia.org/wiki/${encodeURIComponent(query)}`,
-    `https://www.britannica.com/search?query=${encodeURIComponent(query)}`,
-    `https://www.fazfacil.com/search?q=${encodeURIComponent(query)}`
-  ];
-  let combinedText = "";
-  for(const site of sites){
-    try{
-      const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(site)}`);
-      const htmlText = await res.text();
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(htmlText, "text/html");
-      combinedText += " " + summarize(doc.body.innerText || doc.body.textContent, 50);
-    }catch(e){
-      console.log("Falhou:", site);
+      return svg;
     }
-  }
-  return combinedText || "Não consegui achar nada online.";
-}
 
-// Função que gera a resposta
-async function generateResponse(userText){
-  if(!memory.length) return await searchInternet(userText);
+    function spawnZumbi() {
+      if (isUpgradeOpen) return;
+      const zumbi = document.createElement("div");
+      let tipo = "fraco";
+      if (fase >= 5 && Math.random() < 0.3) tipo = "forte";
+      else if (fase >= 3 && Math.random() < 0.6) tipo = "medio";
 
-  let bestMatch = "";
-  let maxScore = 0;
-  memory.forEach(item => {
-    let score = 0;
-    userText.toLowerCase().split(' ').forEach(word => {
-      if(item.text.toLowerCase().includes(word)) score++;
+      zumbi.className = "zumbi " + tipo;
+      zumbi.style.left = Math.random() * (gameArea.clientWidth - 90) + "px";
+      zumbi.dataset.vida = tipo === "forte" ? 3 : tipo === "medio" ? 2 : 1;
+      zumbi.dataset.tipo = tipo;
+      zumbi.appendChild(createSVGZumbi(tipo));
+      zumbi.style.top = "0px";
+      gameArea.appendChild(zumbi);
+
+      let dur = Math.max(1500, 4000 - fase * 200);
+      zumbi.style.transition = `top ${dur}ms linear`;
+      void zumbi.offsetWidth;
+      zumbi.style.top = gameArea.clientHeight + "px";
+
+      setTimeout(() => {
+        if (!isUpgradeOpen && zumbi.parentElement) {
+          const danoZumbi = tipo === "forte" ? 30 : tipo === "medio" ? 20 : 10;
+          vida -= Math.max(0, danoZumbi - danoReducao);
+          zumbiPassSound.currentTime = 0;
+          zumbiPassSound.play();
+          updateUI();
+          if (vida <= 0) gameOver();
+          zumbi.remove();
+        }
+      }, dur);
+    }
+
+    function fireLaser(x) {
+      if (isUpgradeOpen) return;
+
+      for (let i = 0; i < laserCount; i++) {
+        const laser = document.createElement("div");
+        laser.className = "laser";
+        laser.style.left = (x + (i * 18) - 9) + "px";
+        laser.style.top = gameArea.clientHeight - 100 + "px";
+        gameArea.appendChild(laser);
+
+        laser.animate([
+          { transform: "translateY(0)" },
+          { transform: `translateY(-${gameArea.clientHeight}px)` }
+        ], { duration: laserSpeed, easing: "linear" });
+
+        setTimeout(() => laser.remove(), laserSpeed);
+      }
+
+      shootSound.currentTime = 0;
+      shootSound.play();
+      checkLaserHits(x);
+    }
+
+    function checkLaserHits(x) {
+      document.querySelectorAll(".zumbi").forEach(z => {
+        const rect = z.getBoundingClientRect();
+        if (x >= rect.left && x <= rect.right) {
+          let vidaAtual = parseInt(z.dataset.vida);
+          vidaAtual -= dano;
+          if (vidaAtual <= 0) {
+            const tipo = z.dataset.tipo;
+            score += tipo === "forte" ? 3 : tipo === "medio" ? 2 : 1;
+            zumbiDeathSound.currentTime = 0;
+            zumbiDeathSound.play();
+            z.remove();
+            if (score >= fase * 10) {
+              fase++;
+              if (fase % 3 === 0 && upgradesObtidos < maxUpgrades) {
+                showUpgradeMenu();
+              }
+            }
+          } else {
+            z.dataset.vida = vidaAtual;
+          }
+        }
+      });
+      updateUI();
+    }
+
+    function showUpgradeMenu() {
+      isUpgradeOpen = true;
+      clearInterval(spawnInterval);
+      clearZumbis();
+
+      const menu = document.createElement("div");
+      menu.id = "upgradeMenu";
+      menu.innerHTML = "<h2>Escolha um Upgrade</h2>";
+      document.body.appendChild(menu);
+
+      const opcoes = upgrades.sort(() => 0.5 - Math.random()).slice(0, 3);
+      opcoes.forEach(upg => {
+        const btn = document.createElement("div");
+        btn.className = "upgradeOption";
+        btn.textContent = upg.label;
+        btn.onclick = () => {
+          chooseUpgrade(upg.key);
+          menu.remove();
+          isUpgradeOpen = false;
+          startFase();
+        };
+        menu.appendChild(btn);
+      });
+    }
+
+    function chooseUpgrade(tipo) {
+      upgradesObtidos++;
+      if (tipo === "dano") dano++;
+      else if (tipo === "velocidade") laserSpeed = Math.max(100, laserSpeed - 50);
+      else if (tipo === "vida") vida = Math.min(100, vida + 30);
+      else if (tipo === "alcance") laserSpeed += 150;
+      else if (tipo === "maisLaser") laserCount++;
+      else if (tipo === "escudo") danoReducao += 5;
+      updateUI();
+    }
+
+    function updateUI() {
+      scoreEl.textContent = "Pontos: " + score;
+      faseEl.textContent = "Fase: " + fase;
+      lifeBar.style.width = vida + "%";
+    }
+
+    function clearZumbis() {
+      document.querySelectorAll(".zumbi, .laser").forEach(e => e.remove());
+    }
+
+    function gameOver() {
+      clearInterval(spawnInterval);
+      bgMusic.pause();
+      alert("💀 GAME OVER! Pontuação: " + score);
+      startBtn.style.display = "block";
+    }
+
+    startBtn.addEventListener("click", () => {
+      score = 0; fase = 1; vida = 100;
+      dano = 1; laserCount = 1; laserSpeed = 200; danoReducao = 0;
+      upgradesObtidos = 0; isUpgradeOpen = false;
+      clearZumbis();
+      startBtn.style.display = "none";
+      bgMusic.currentTime = 0;
+      bgMusic.play();
+      startFase();
     });
-    if(score > maxScore){
-      maxScore = score;
-      bestMatch = item.text;
+
+    gameArea.addEventListener("click", (e) => {
+      if (!isUpgradeOpen) fireLaser(e.clientX);
+    });
+
+    function startFase() {
+      clearInterval(spawnInterval);
+      spawnInterval = setInterval(spawnZumbi, Math.max(600, 2000 - fase * 100));
+      updateUI();
     }
-  });
-  if(maxScore>0) return bestMatch;
-  return await searchInternet(userText);
-}
-
-// Envia mensagem
-async function sendMessage() {
-  const text = input.value.trim();
-  if(!text) return;
-  chat.innerHTML += `<div><b>Você:</b> ${text}</div>`;
-  input.value = '';
-
-  let response = "";
-
-  if(text.startsWith("http")) {
-    try {
-      const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(text)}`);
-      const htmlText = await res.text();
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(htmlText, "text/html");
-      const bodyText = doc.body.innerText || doc.body.textContent;
-      const summary = summarize(bodyText, 100);
-      saveMemory(summary);
-      response = "Aprendi algo novo desse site!";
-    } catch(e) {
-      response = "Não consegui acessar o site.";
-    }
-  } else {
-    response = await generateResponse(text);
-    saveMemory(response); // salvar resposta gerada também
-  }
-
-  chat.innerHTML += `<div><b>RenatAI:</b> ${response}</div>`;
-  chat.scrollTop = chat.scrollHeight;
-}
-</script>
-
+  </script>
 </body>
 </html>
